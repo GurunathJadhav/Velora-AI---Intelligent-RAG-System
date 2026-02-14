@@ -1,0 +1,220 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Velora AI — RAG Internal Workflow</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#030712;--surface:rgba(15,23,42,0.88);--border:rgba(56,78,135,0.5);--ink:#e2e8f0;--muted:#94a3b8;--blue:#38bdf8;--purple:#a78bfa;--green:#34d399;--cyan:#22d3ee;--red:#f87171;--yellow:#fbbf24;--pink:#f472b6;}
+*{margin:0;padding:0;box-sizing:border-box;}
+html{scroll-behavior:smooth;}
+body{background:var(--bg);color:var(--ink);font-family:'Inter',sans-serif;line-height:1.6;}
+body::before{content:"";position:fixed;inset:0;background:radial-gradient(ellipse 800px 600px at 20% 10%,rgba(56,189,248,.07),transparent 60%),radial-gradient(ellipse 800px 600px at 80% 90%,rgba(167,139,250,.07),transparent 60%);pointer-events:none;z-index:0;}
+.header{text-align:center;padding:60px 24px 20px;position:relative;z-index:1;}
+.header h1{font-size:clamp(26px,5vw,48px);font-weight:900;background:linear-gradient(135deg,var(--blue),var(--purple),var(--green));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;}
+.header .sub{font-size:clamp(14px,2vw,18px);color:var(--muted);margin-top:10px;}
+.header .tech{font-size:12px;color:var(--muted);margin-top:8px;letter-spacing:1px;}
+.header .tech span{color:var(--cyan);font-weight:700;}
+.example-banner{max-width:900px;margin:0 auto 10px;padding:16px 24px;background:rgba(56,189,248,.06);border:1px solid rgba(56,189,248,.2);border-radius:14px;text-align:center;position:relative;z-index:1;}
+.example-banner .label{font-size:11px;font-weight:800;letter-spacing:2px;text-transform:uppercase;color:var(--blue);margin-bottom:6px;}
+.example-banner .desc{font-size:14px;color:var(--ink);}
+.example-banner code{font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--cyan);background:rgba(0,0,0,.4);padding:2px 8px;border-radius:4px;}
+.flow{max-width:900px;margin:0 auto;padding:0 24px 140px;position:relative;z-index:1;}
+.connector{display:flex;justify-content:center;padding:8px 0;}
+.connector .arrow{width:3px;height:50px;background:linear-gradient(to bottom,var(--purple),var(--blue));position:relative;border-radius:999px;box-shadow:0 0 12px rgba(56,189,248,.3);}
+.connector .arrow::after{content:"";position:absolute;bottom:-8px;left:50%;transform:translateX(-50%);border-left:7px solid transparent;border-right:7px solid transparent;border-top:9px solid var(--blue);}
+.connector.gen .arrow{background:linear-gradient(to bottom,var(--blue),var(--green));}
+.connector.gen .arrow::after{border-top-color:var(--green);}
+.step-card{background:var(--surface);border:1px solid var(--border);border-radius:20px;padding:32px 36px;backdrop-filter:blur(20px);position:relative;box-shadow:0 4px 30px rgba(0,0,0,.4);transition:all .4s ease;}
+.step-card.gen{border-color:rgba(52,211,153,.4);}
+.step-badge{position:absolute;top:-16px;left:32px;width:42px;height:42px;background:linear-gradient(135deg,var(--blue),var(--purple));border-radius:12px;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:20px;color:#fff;box-shadow:0 4px 18px rgba(56,189,248,.4);}
+.step-card.gen .step-badge{background:linear-gradient(135deg,var(--cyan),var(--green));box-shadow:0 4px 18px rgba(52,211,153,.4);}
+.marker{position:absolute;top:-16px;right:32px;font-size:11px;font-weight:800;letter-spacing:1.5px;text-transform:uppercase;padding:5px 14px;border-radius:999px;background:rgba(52,211,153,.15);border:1px solid rgba(52,211,153,.3);color:var(--green);}
+.step-title{font-size:clamp(20px,3vw,28px);font-weight:800;margin:6px 0 4px;}
+.step-subtitle{font-size:clamp(14px,2vw,16px);color:var(--muted);margin-bottom:16px;}
+.anim-box{background:rgba(0,0,0,.35);border:1px solid rgba(56,78,135,.35);border-radius:14px;overflow:hidden;position:relative;margin-bottom:14px;}
+.anim-box canvas{display:block;width:100%;height:100%;}
+.detail-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+@media(max-width:600px){.detail-grid{grid-template-columns:1fr;}}
+.detail-box{background:rgba(0,0,0,.3);border:1px solid rgba(56,78,135,.35);border-radius:14px;padding:16px 18px;}
+.detail-box h4{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--blue);margin-bottom:8px;}
+.step-card.gen .detail-box h4{color:var(--green);}
+.detail-box p{font-size:14px;color:var(--ink);line-height:1.6;}
+.detail-box code{font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--cyan);background:rgba(0,0,0,.4);padding:2px 6px;border-radius:4px;}
+.phase-divider{text-align:center;padding:30px 0;}
+.phase-divider .line{width:100%;height:2px;background:linear-gradient(90deg,transparent,var(--purple),var(--green),transparent);margin-bottom:12px;box-shadow:0 0 20px rgba(167,139,250,.3);}
+.phase-divider .label{font-size:13px;font-weight:800;letter-spacing:3px;text-transform:uppercase;color:var(--muted);}
+</style>
+</head>
+<body>
+<div class="header">
+  <h1>Velora AI — RAG Workflow</h1>
+  <p class="sub">Exact internal pipeline — animated step-by-step</p>
+  <p class="tech">Built with <span>FastAPI</span> · <span>LangChain</span> · <span>HuggingFace</span> · <span>Upstash Vector</span> · <span>Llama 3.2</span></p>
+</div>
+
+<div class="example-banner">
+  <div class="label">🔬 Live Example Walkthrough</div>
+  <div class="desc">User ingests <code>https://aseuro.com</code> → then asks <code>"What services does Aseuro offer?"</code></div>
+</div>
+
+<div class="flow">
+
+<!-- STEP 1: DATA SOURCES -->
+<div class="step-card" data-step="1">
+  <div class="step-badge">1</div><div class="marker">START</div>
+  <div class="step-title">Data Sources</div>
+  <div class="step-subtitle">URLs via Playwright browser + File uploads (PDF, DOCX, CSV, TXT)</div>
+  <div class="anim-box" style="height:200px;"><canvas id="c1"></canvas></div>
+  <div class="detail-grid">
+    <div class="detail-box"><h4>URL Ingestion</h4><p>Playwright headless Chromium renders JavaScript-heavy pages. Supports <code>recursive=true</code> to crawl same-domain links (depth ≤ 2, max 500 pages).</p></div>
+    <div class="detail-box"><h4>File Ingestion</h4><p>Accepts <code>.pdf</code> (PyPDFLoader), <code>.docx</code> (Docx2txtLoader), <code>.csv</code> (CSVLoader), <code>.txt</code> (TextLoader) via <code>/internal/ingest-files</code>.</p></div>
+  </div>
+</div>
+<div class="connector"><div class="arrow"></div></div>
+
+<!-- STEP 2: INGESTION PIPELINE -->
+<div class="step-card" data-step="2">
+  <div class="step-badge">2</div>
+  <div class="step-title">Ingestion Pipeline</div>
+  <div class="step-subtitle">Playwright renders page → HTML fetched → BeautifulSoup parses → Document objects created</div>
+  <div class="anim-box" style="height:180px;"><canvas id="c2"></canvas></div>
+  <div class="detail-grid">
+    <div class="detail-box"><h4>Web Pipeline</h4><p><code>page.goto(url, wait_until="networkidle")</code> → scroll to bottom → <code>page.content()</code> → <code>_extract_structured_content()</code></p></div>
+    <div class="detail-box"><h4>File Pipeline</h4><p>Temp file created → format-specific loader → <code>Document(page_content, metadata)</code> objects → temp file deleted.</p></div>
+  </div>
+</div>
+<div class="connector"><div class="arrow"></div></div>
+
+<!-- STEP 3: PREPROCESSING -->
+<div class="step-card" data-step="3">
+  <div class="step-badge">3</div>
+  <div class="step-title">Preprocessing — BeautifulSoup</div>
+  <div class="step-subtitle">Remove noise (script/style/noscript/iframe/svg) → Extract structured text → Attach metadata</div>
+  <div class="anim-box" style="height:200px;"><canvas id="c3"></canvas></div>
+  <div class="detail-grid">
+    <div class="detail-box"><h4>Structured Extraction</h4><p>Headers → <code># H1</code>, paragraphs → text, lists → <code>- item</code>, images → <code>[Image: alt]</code>, links → <code>[text](href)</code>.</p></div>
+    <div class="detail-box"><h4>Metadata</h4><p>Extracts <code>&lt;title&gt;</code>, <code>meta description</code>, <code>meta keywords</code>. Normalizes whitespace: max 2 newlines, collapse spaces.</p></div>
+  </div>
+</div>
+<div class="connector"><div class="arrow"></div></div>
+
+<!-- STEP 4: TEXT CHUNKING -->
+<div class="step-card" data-step="4">
+  <div class="step-badge">4</div>
+  <div class="step-title">Text Chunking</div>
+  <div class="step-subtitle">RecursiveCharacterTextSplitter — chunk_size=400, overlap=50, separators=["\n\n", "\n", " ", ""]</div>
+  <div class="anim-box" style="height:200px;"><canvas id="c4"></canvas></div>
+  <div class="detail-grid">
+    <div class="detail-box"><h4>Strategy</h4><p>Tries <code>"\n\n"</code> first (paragraphs), falls back to <code>"\n"</code>, then <code>" "</code> (words), then <code>""</code> (chars). Each chunk ≤ 400 chars with 50-char overlap.</p></div>
+    <div class="detail-box"><h4>Example Output</h4><p>Aseuro homepage → ~15 chunks. Each chunk carries <code>metadata: {source: "https://aseuro.com"}</code>.</p></div>
+  </div>
+</div>
+<div class="connector"><div class="arrow"></div></div>
+
+<!-- STEP 5: EMBEDDING MODEL -->
+<div class="step-card" data-step="5">
+  <div class="step-badge">5</div>
+  <div class="step-title">Embedding Model</div>
+  <div class="step-subtitle">sentence-transformers/all-MiniLM-L6-v2 → 384-dimensional dense vectors (runs locally, no API key)</div>
+  <div class="anim-box" style="height:250px;"><canvas id="c5"></canvas></div>
+  <div class="detail-grid">
+    <div class="detail-box"><h4>Model Details</h4><p><code>HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")</code>. Local inference, no API calls. 384-dim output.</p></div>
+    <div class="detail-box"><h4>Batch Processing</h4><p>Chunks embedded in batches of 20. Auto-retry with exponential backoff (up to 3 retries). Each vector gets a UUID5 ID.</p></div>
+  </div>
+</div>
+<div class="connector"><div class="arrow"></div></div>
+
+<!-- STEP 6: VECTOR DATABASE -->
+<div class="step-card" data-step="6">
+  <div class="step-badge">6</div>
+  <div class="step-title">Upstash Vector Database</div>
+  <div class="step-subtitle">Cloud serverless vector store — namespace filtering — 24h TTL auto-cleanup</div>
+  <div class="anim-box" style="height:240px;"><canvas id="c6"></canvas></div>
+  <div class="detail-grid">
+    <div class="detail-box"><h4>Upsert</h4><p>Vectors upserted in batches of 50. Each vector stores: <code>{id, vector, metadata: {text, namespace, url, source}, ttl: 86400}</code>.</p></div>
+    <div class="detail-box"><h4>Namespacing</h4><p>Each data source gets a namespace (e.g. <code>"aseuro"</code>). Queries filter by <code>namespace = 'aseuro'</code> to scope results.</p></div>
+  </div>
+</div>
+
+<div class="phase-divider"><div class="line"></div><div class="label">Indexing Phase Complete — Query Phase Begins</div></div>
+
+<!-- STEP 7: USER QUERY + EXPANSION -->
+<div class="step-card" data-step="7">
+  <div class="step-badge">7</div><div class="marker">Online</div>
+  <div class="step-title">User Query + Expansion</div>
+  <div class="step-subtitle">Question → QueryExpander generates synonym variations → Embed each variation</div>
+  <div class="anim-box" style="height:220px;"><canvas id="c7"></canvas></div>
+  <div class="detail-grid">
+    <div class="detail-box"><h4>Query Expansion</h4><p><code>QueryExpander</code> uses synonym map (services→offerings, solutions, products, capabilities). Generates up to 3 query variations.</p></div>
+    <div class="detail-box"><h4>Embedding</h4><p>Each variation is embedded with the same <code>all-MiniLM-L6-v2</code> model. All variation vectors are used for search.</p></div>
+  </div>
+</div>
+<div class="connector"><div class="arrow"></div></div>
+
+<!-- STEP 8: SIMILARITY SEARCH -->
+<div class="step-card" data-step="8">
+  <div class="step-badge">8</div>
+  <div class="step-title">Similarity Search</div>
+  <div class="step-subtitle">Upstash .query() with namespace filter — top_k×2 results — deduplicate across variations</div>
+  <div class="anim-box" style="height:340px;"><canvas id="c8"></canvas></div>
+  <div class="detail-grid">
+    <div class="detail-box"><h4>Search Logic</h4><p>For each query variation: <code>index.query(vector, top_k=top_k*2, filter="namespace='aseuro'")</code>. Results deduplicated by text content.</p></div>
+    <div class="detail-box"><h4>Output</h4><p>Returns <code>{text, score, metadata, url, source_type: "local"}</code> for each matched chunk. Higher score = more relevant.</p></div>
+  </div>
+</div>
+<div class="connector"><div class="arrow"></div></div>
+
+<!-- STEP 9: RE-RANKING -->
+<div class="step-card" data-step="9">
+  <div class="step-badge">9</div>
+  <div class="step-title">Cross-Encoder Re-Ranking</div>
+  <div class="step-subtitle">cross-encoder/ms-marco-MiniLM-L-6-v2 jointly scores query+chunk pairs for precision</div>
+  <div class="anim-box" style="height:200px;"><canvas id="c9"></canvas></div>
+  <div class="detail-grid">
+    <div class="detail-box"><h4>How It Works</h4><p>Creates <code>[[query, chunk_text]]</code> pairs → <code>CrossEncoder.predict(pairs)</code> → replaces bi-encoder scores with cross-encoder scores → sorts desc.</p></div>
+    <div class="detail-box"><h4>Result</h4><p>Each result gets <code>original_score</code> (bi-encoder) and <code>rerank_score</code> (cross-encoder). Returns top-K by rerank_score.</p></div>
+  </div>
+</div>
+<div class="connector gen"><div class="arrow"></div></div>
+
+<!-- STEP 10: PROMPT CONSTRUCTION -->
+<div class="step-card gen" data-step="10">
+  <div class="step-badge">10</div>
+  <div class="step-title">Prompt Construction</div>
+  <div class="step-subtitle">Velora AI System Prompt + Chat History (MessagesPlaceholder) + Top-5 Context + Question</div>
+  <div class="anim-box" style="height:220px;"><canvas id="c10"></canvas></div>
+  <div class="detail-grid">
+    <div class="detail-box"><h4>System Prompt</h4><p>"You are Velora AI..." — instructs plain text only, no JSON. Cites context, handles greetings without context, includes current datetime.</p></div>
+    <div class="detail-box"><h4>Context Assembly</h4><p>Top 5 re-ranked chunks joined as <code>"Content: {text}"</code>. Simple queries (hi, hello) force empty context to avoid pollution.</p></div>
+  </div>
+</div>
+<div class="connector gen"><div class="arrow"></div></div>
+
+<!-- STEP 11: LLM GENERATION -->
+<div class="step-card gen" data-step="11">
+  <div class="step-badge">11</div>
+  <div class="step-title">LLM Generation</div>
+  <div class="step-subtitle">meta-llama/Llama-3.2-3B-Instruct via HuggingFace Inference API — temp=0.1, max_new_tokens=1000</div>
+  <div class="anim-box" style="height:360px;"><canvas id="c11"></canvas></div>
+  <div class="detail-box" id="tokenOutput"><h4>Generated Tokens</h4><p id="genText" style="font-family:'JetBrains Mono',monospace;font-size:13px;color:var(--green);min-height:20px;"></p></div>
+</div>
+<div class="connector gen"><div class="arrow"></div></div>
+
+<!-- STEP 12: FINAL OUTPUT -->
+<div class="step-card gen" data-step="12">
+  <div class="step-badge">12</div><div class="marker" style="background:rgba(167,139,250,.15);border-color:rgba(167,139,250,.3);color:var(--purple);">END</div>
+  <div class="step-title">Final Output</div>
+  <div class="step-subtitle">Returns {summary: "plain text answer", extracted_data: {}} — grounded, no hallucination</div>
+  <div class="anim-box" style="height:220px;"><canvas id="c12"></canvas></div>
+  <div class="detail-grid">
+    <div class="detail-box"><h4>Response Format</h4><p><code>{"summary": "Aseuro offers IT consulting, cloud solutions...", "extracted_data": {}}</code> — always plain text, never JSON in the answer body.</p></div>
+    <div class="detail-box"><h4>Error Handling</h4><p>On LLM failure: returns graceful fallback message. Chat history (last 10 messages) maintained for multi-turn conversations.</p></div>
+  </div>
+</div>
+
+</div>
+<script src="rag-animations.js"></script>
+</body>
+</html>
