@@ -1,0 +1,89 @@
+@import "tailwindcss";
+
+@theme {
+  --color-primary-50: #ecfdf5;
+  --color-primary-100: #d1fae5;
+  --color-primary-200: #a7f3d0;
+  --color-primary-300: #6ee7b7;
+  --color-primary-400: #34d399;
+  --color-primary-500: #10b981;
+  --color-primary-600: #059669;
+  --color-primary-700: #047857;
+  --color-primary-800: #065f46;
+  --color-primary-900: #064e3b;
+
+  --color-dark-theme-bg: #0B0C0E;
+  --color-dark-theme-panel: #16171B;
+  --color-dark-theme-border: #23252A;
+  --color-dark-theme-text: #E1E2E5;
+  --color-dark-theme-accent: #8B5CF6; /* Purple accent like the image gradient */
+
+  --font-sans: 'Inter', sans-serif;
+
+  --animate-fade-in: fadeIn 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  --animate-slide-up: slideUp 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+
+  @keyframes fadeIn {
+    0% { opacity: 0; }
+    100% { opacity: 1; }
+  }
+
+  @keyframes slideUp {
+    0% { opacity: 0; transform: translateY(20px); }
+    100% { opacity: 1; transform: translateY(0); }
+  }
+}
+
+@layer base {
+  body {
+    @apply bg-dark-theme-bg text-dark-theme-text font-sans selection:bg-primary-500/30;
+  }
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
+.premium-gradient {
+  background: radial-gradient(circle at 50% 50%, rgba(139, 92, 246, 0.1) 0%, transparent 60%),
+              radial-gradient(circle at 0% 0%, rgba(16, 185, 129, 0.05) 0%, transparent 40%);
+}
+
+.glass-morphism {
+  @apply bg-white/[0.03] backdrop-blur-xl border border-white/10;
+}
+
+/* Chat Bubbles */
+.message-user {
+  @apply bg-white/[0.03] border border-white/5;
+}
+
+.message-ai {
+  @apply bg-transparent;
+}
+
+/* Markdown Styles */
+.prose {
+  @apply text-dark-theme-text max-w-none;
+}
+.prose h1, .prose h2, .prose h3 {
+  @apply text-white font-semibold mt-4 mb-2;
+}
+.prose p {
+  @apply mb-4 leading-7 text-[15px];
+}
+.prose ul, .prose ol {
+  @apply ml-6 mb-4 space-y-2;
+}
+.prose li {
+  @apply list-disc;
+}
+.prose strong {
+  @apply text-white;
+}
+.prose code {
+  @apply bg-white/10 px-1.5 py-0.5 rounded text-sm font-mono text-purple-300;
+}
+.prose pre {
+  @apply bg-black/40 p-4 rounded-xl overflow-x-auto my-4 border border-white/5;
+}
