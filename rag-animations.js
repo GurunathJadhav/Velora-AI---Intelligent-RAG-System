@@ -4,19 +4,30 @@
 ================================================================ */
 
 const allCanvases = {};
-function setupCanvas(id, h){
+const canvasDefaults = {};
+function setupCanvas(id, fallbackH){
   const el = document.getElementById(id);
   if(!el) return null;
   const box = el.parentElement;
+  // Use actual computed height (CSS media queries may override inline style)
+  const computedH = box.offsetHeight || fallbackH;
   el.width = box.offsetWidth * 2;
-  el.height = h * 2;
+  el.height = computedH * 2;
   el.style.width = box.offsetWidth + 'px';
-  el.style.height = h + 'px';
+  el.style.height = computedH + 'px';
   const ctx = el.getContext('2d');
   ctx.scale(2,2);
-  allCanvases[id] = {el, ctx, w: box.offsetWidth, h, active: true};
+  allCanvases[id] = {el, ctx, w: box.offsetWidth, h: computedH, active: true};
+  canvasDefaults[id] = fallbackH;
   return allCanvases[id];
 }
+let resizeTimer;
+window.addEventListener('resize', ()=>{
+  clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(()=>{
+    Object.keys(canvasDefaults).forEach(id=>setupCanvas(id, canvasDefaults[id]));
+  }, 200);
+});
 window.addEventListener('load', ()=>{
   setupCanvas('c1',200); setupCanvas('c2',180); setupCanvas('c3',200);
   setupCanvas('c4',200); setupCanvas('c5',250); setupCanvas('c6',240);
@@ -849,8 +860,9 @@ function draw12(c,t){
   });
 }
 
-/* ===== ANIMATION LOOP (all canvases always active) ===== */
+/* ===== ANIMATION LOOP (all canvases, global responsive scaling) ===== */
 const drawFns={c1:draw1,c2:draw2,c3:draw3,c4:draw4,c5:draw5,c6:draw6,c7:draw7,c8:draw8,c9:draw9,c10:draw10,c11:draw11,c12:draw12};
+const DESIGN_W = 860; // reference width all draw functions were designed for
 let startTime=performance.now();
 function startAnimLoop(){
   let genTimer=0;
@@ -858,7 +870,16 @@ function startAnimLoop(){
     const t=(performance.now()-startTime)/1000;
     for(const id in allCanvases){
       const c=allCanvases[id];
-      if(drawFns[id]) drawFns[id](c,t);
+      if(!drawFns[id]) continue;
+      const realW=c.w, realH=c.h;
+      const s=Math.min(1, realW/DESIGN_W); // scale factor (1.0 on desktop, <1 on smaller)
+      c.ctx.save();
+      c.ctx.clearRect(0,0,realW,realH);
+      c.ctx.scale(s,s);
+      // Pass virtual (design-sized) dimensions to draw functions
+      const virtualC = {ctx:c.ctx, w:realW/s, h:realH/s, el:c.el, active:c.active};
+      drawFns[id](virtualC,t);
+      c.ctx.restore();
     }
     genTimer++;
     if(genTimer%3===0) animateGenText(true);
